@@ -1,0 +1,18 @@
+{
+  "$schema": "./schema/model-router.schema.json",
+  "version": 2,
+  "apply_mode": "warn",
+  "allow_fable_autoswitch": true,
+  "planning_delivery": "delegate",
+  "subagent_enforcement": "on",
+  "classifier": { "cli_fallback": false },
+  "thresholds": { "effort_warn_distance": 3 },
+  "classes": {
+    "planning": { "target": { "model": "fable", "effort": "high" } },
+    "mechanical": { "target": { "model": "sonnet", "effort": "low" } },
+    "implementation": { "target": { "model": "sonnet", "effort": "medium" } },
+    "debugging": { "target": { "model": "opus", "effort": "high" } },
+    "architecture": { "target": { "model": "opus", "effort": "xhigh" } },
+    "extreme": { "target": { "model": "opus", "effort": "max" } }
+  }
+}
