@@ -1269,7 +1269,7 @@ class TestVariantCoverage(unittest.TestCase):
 
     def test_every_default_target_has_matching_variant(self):
         classes = DEFAULTS["classes"]
-        self.assertEqual(len(classes), 5)
+        self.assertEqual(len(classes), 6)
         for class_name, class_cfg in classes.items():
             target = class_cfg["target"]
             model = target["model"]

@@ -16,6 +16,7 @@ from router.ladder import detect_tier  # noqa: E402
 
 PLUGIN_PREFIX = "claude-model-router-hook:"
 GENERIC_TYPES = ("general-purpose", "default", "claude")
+PLANNING_TYPES = ("plan", "planner", "planning")
 
 
 def _env_model_warning(decision_model):
@@ -91,9 +92,12 @@ def main():
     if enforcement == "off":
         sys.exit(0)
 
-    klass, _score = taxonomy.classify(
-        prompt, cfg, os.environ.get("CLAUDE_PLUGIN_DATA")
-    )
+    if isinstance(subagent_type, str) and subagent_type.lower() in PLANNING_TYPES:
+        klass = "planning"
+    else:
+        klass, _score = taxonomy.classify(
+            prompt, cfg, os.environ.get("CLAUDE_PLUGIN_DATA")
+        )
     if klass is None:
         sys.exit(0)  # abstain: pass through (AC-4.3)
 
@@ -129,7 +133,7 @@ def main():
         hookio.log("SUBAGENT-ADVISORY", prompt, klass=decision.klass, model="fable")
         hookio.emit_pretooluse(
             system_message=(
-                "Model router: this subagent task looks extreme-class "
+                f"Model router: this subagent task looks {decision.klass}-class "
                 "(fable-tier). Set allow_fable_autoswitch to enable rewrites."
             )
         )

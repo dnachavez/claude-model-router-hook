@@ -9,6 +9,7 @@ DEFAULTS = {
     "version": 2,
     "apply_mode": "warn",
     "allow_fable_autoswitch": False,
+    "planning_delivery": "delegate",
     "subagent_enforcement": "on",
     "classifier": {
         "cli_fallback": True,
@@ -31,6 +32,14 @@ DEFAULTS = {
             "remove_keywords": [],
             "remove_patterns": [],
             "target": {"model": "haiku"},
+        },
+        "planning": {
+            "mode": "extend",
+            "keywords": [],
+            "patterns": [],
+            "remove_keywords": [],
+            "remove_patterns": [],
+            "target": {"model": "fable", "effort": "high"},
         },
         "implementation": {
             "mode": "extend",
@@ -231,6 +240,8 @@ def _normalize_config(cfg):
         cfg["apply_mode"] = "warn"
     if cfg.get("subagent_enforcement") not in ("on", "advisory", "off"):
         cfg["subagent_enforcement"] = "on"
+    if cfg.get("planning_delivery") not in ("delegate", "switch"):
+        cfg["planning_delivery"] = "delegate"
     allow = cfg.get("allow_fable_autoswitch")
     cfg["allow_fable_autoswitch"] = allow if isinstance(allow, bool) else False
 

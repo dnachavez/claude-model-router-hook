@@ -53,18 +53,20 @@ These rules apply to YOU and to every sub-agent you spawn.
 | Class | Target model | Effort | When to use |
 |---|---|---|---|
 | mechanical | haiku | none | Git ops, renames, formatting, lint, file moves, version bumps, quick lookups, short imperative tasks. |
+| planning | fable | high | Implementation plans, roadmaps, task breakdowns, plan-mode requests, and anything asked for before code is written. |
 | implementation | opus | medium | Writing or editing code, building features, creating components or APIs, writing tests, standard feature work. |
 | debugging | opus | high | Diagnosing failures, flaky tests, races, regressions, stack traces, bisecting, reproducing bugs. |
 | architecture | opus | xhigh | Architecture decisions, tradeoff analysis, redesigns, deep multi-file analysis, sustained reasoning over large context. |
-| extreme | opus | max | Multi-system migrations, codebase-wide rewrites, long-horizon plans, RFCs and design docs, platform-scale work. |
+| extreme | opus | max | Multi-system migrations, codebase-wide rewrites, long-horizon programs, RFCs and design docs, platform-scale work. |
 | abstain | (no routing) | - | Prompt does not clearly match any class; current model and effort pass through unmodified. |
 
 ### Sub-agent model selection (MANDATORY)
 
 When calling the Agent tool, set the model parameter to match the task class
 above. Do not default every sub-agent to the highest effort. Match the model
-and effort to the work: mechanical work goes to haiku, implementation to opus,
-debugging to opus, deep analysis to opus, and platform-scale work to opus.
+and effort to the work: mechanical work goes to haiku, planning to fable,
+implementation to opus, debugging to opus, deep analysis to opus, and platform-
+scale work to opus.
 <!-- advisory:end -->
 
 ## Configure
@@ -76,6 +78,7 @@ Use `~/.claude/model-router.json` globally or `.claude/model-router.json` in one
   "version": 2,
   "apply_mode": "warn",
   "allow_fable_autoswitch": false,
+  "planning_delivery": "delegate",
   "subagent_enforcement": "on",
   "classifier": { "cli_fallback": true },
   "thresholds": { "effort_warn_distance": 2 }
@@ -86,6 +89,7 @@ Use `~/.claude/model-router.json` globally or `.claude/model-router.json` in one
 |---|---|---|
 | `apply_mode` | `warn` | Warn or write the model for the next session. |
 | `allow_fable_autoswitch` | `false` | Allow autoswitching to an explicitly configured `fable` target. |
+| `planning_delivery` | `delegate` | Hand planning prompts to a sub-agent on the planning target, or `switch` to warn and block. |
 | `subagent_enforcement` | `on` | Route, advise, or ignore sub-agent spawns. |
 | `classifier.cli_fallback` | `true` | Use `claude -p --model haiku` for ambiguous prompts. |
 | `thresholds.effort_warn_distance` | `2` | Warn near a class boundary. |

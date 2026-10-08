@@ -25,10 +25,11 @@ CLI_TIMEOUT_CEILING = 8
 
 # Bump when the taxonomy/classification prompt changes so stale cached
 # classes are invalidated (cache keys include this revision).
-TAXONOMY_REV = "1"
+TAXONOMY_REV = "2"
 
 PROMPT_TEMPLATE = """Classify this coding-assistant request into exactly one class.
 mechanical: git ops, renames, formatting, trivial single-step edits
+planning: explicit requests for an implementation plan, roadmap, or task breakdown before coding
 implementation: writing or modifying code/features/tests, routine work
 debugging: diagnosing failures, flaky tests, errors, regressions
 architecture: design decisions, tradeoffs, deep multi-file analysis

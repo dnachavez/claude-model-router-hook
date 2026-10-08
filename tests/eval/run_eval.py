@@ -30,17 +30,18 @@ from router.config import DEFAULTS  # noqa: E402
 from router.ladder import MODEL_IDS, TIERS  # noqa: E402
 
 # The default policy is intentionally quality-first for agentic coding: all
-# non-mechanical classes route to Opus at graduated effort levels, while Fable
-# remains an explicit opt-in configuration target.  Every labeled routable row
+# non-mechanical execution classes route to Opus at graduated effort levels.
+# Fable is the planning target only; anywhere else it remains an explicit
+# opt-in configuration target.  Every labeled routable row
 # carries its expected `(model, effort)` pair, so route accuracy is a stronger
 # regression signal than a broad model-share ceiling.
 ACCURACY_MIN = 0.95       # min overall classification accuracy (baseline 1.0)
 ROUTE_ACCURACY_MIN = 1.0  # every labeled default route must retain its target
-FABLE_SHARE_MAX = 0.0     # Fable is never a shipped default route
+FABLE_SHARE_MAX = 0.0     # Fable is never a shipped default outside planning
 P95_MAX_MS = 200.0        # heuristic classify p95 wall time (NFR-1)
 
 CLASS_ORDER = (
-    "mechanical", "implementation", "debugging",
+    "mechanical", "planning", "implementation", "debugging",
     "architecture", "extreme", "abstain",
 )
 
@@ -75,6 +76,7 @@ def run():
     per_class_correct = collections.Counter()
     confusion = collections.Counter()          # (expected, predicted) -> n
     model_counts = collections.Counter()       # decided tier -> n (non-abstain)
+    non_planning_fable = 0
     times_ms = []
     mythos_emissions = 0
     non_abstain = 0
@@ -107,6 +109,8 @@ def run():
                 mythos_emissions += 1
             model_counts[decision.model] += 1
             non_abstain += 1
+            if decision.model == "fable" and decision.klass != "planning":
+                non_planning_fable += 1
 
         expected_route = row.get("expected")
         if isinstance(expected_route, dict):
@@ -126,7 +130,7 @@ def run():
     accuracy = correct / total if total else 0.0
     route_accuracy = route_correct / route_total if route_total else 1.0
     p95_ms = percentile(times_ms, 0.95)
-    fable_share = model_counts["fable"] / non_abstain if non_abstain else 0.0
+    fable_share = non_planning_fable / non_abstain if non_abstain else 0.0
 
     # ---- Report ----
     print("=== Router eval ({} rows, cli_fallback=false) ===".format(total))
@@ -187,7 +191,7 @@ def run():
         )
     if fable_share > FABLE_SHARE_MAX:
         failures.append(
-            "fable share {:.2%} > FABLE_SHARE_MAX {:.2%}".format(
+            "fable share outside planning {:.2%} > FABLE_SHARE_MAX {:.2%}".format(
                 fable_share, FABLE_SHARE_MAX))
     if p95_ms >= P95_MAX_MS:
         failures.append(

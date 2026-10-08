@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented here.
 
+## [Unreleased]
+
+### Added
+- `planning` task class, routed to Fable at `high` effort. It matches explicit requests for a plan ("make a plan for", "plan out", "roadmap for", "break X down into", "use plan mode", "before writing any code") and leaves `plan` the noun ("subscription plan", `PlanCard`) to the other classes.
+- `planning_delivery` option. `delegate` (default) lets a planning prompt through and tells the session to gather context, hand the plan to a sub-agent on the planning target, and wait for approval before executing. `switch` keeps the blocking `/model` warning.
+- `Plan`, `planner`, and `planning` sub-agent spawns are routed as planning regardless of their prompt.
+
+### Changed
+- `plan mode` moved from the architecture keywords to planning. A planning request skips the architecture-to-extreme escalation.
+- The eval Fable-share gate counts only Fable decisions outside planning.
+
 ## [2.1.0] - 2026-08-28
 
 ### Added

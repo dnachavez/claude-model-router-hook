@@ -24,6 +24,11 @@ CLASS_ROWS = (
         "quick lookups, short imperative tasks.",
     ),
     (
+        "planning",
+        "Implementation plans, roadmaps, task breakdowns, plan-mode requests, "
+        "and anything asked for before code is written.",
+    ),
+    (
         "implementation",
         "Writing or editing code, building features, creating components or "
         "APIs, writing tests, standard feature work.",
@@ -40,7 +45,7 @@ CLASS_ROWS = (
     ),
     (
         "extreme",
-        "Multi-system migrations, codebase-wide rewrites, long-horizon plans, "
+        "Multi-system migrations, codebase-wide rewrites, long-horizon programs, "
         "RFCs and design docs, platform-scale work.",
     ),
 )
@@ -77,6 +82,7 @@ _SELECTION_LEAD = (
 # contributes no clause, so the prose never names a model for it.
 _SELECTION_CLAUSES = (
     ("mechanical", "mechanical work goes to "),
+    ("planning", "planning to "),
     ("implementation", "implementation to "),
     ("debugging", "debugging to "),
     ("architecture", "deep analysis to "),
@@ -180,8 +186,8 @@ ADVISORY_MD = render_advisory()
 _TIER_HINTS = (
     (
         "fable",
-        "You are currently on fable. Reserve it for extreme, platform-scale "
-        "work; route everything lighter down the ladder.",
+        "You are currently on fable. Reserve it for planning and the hardest "
+        "platform-scale work; route everything lighter down the ladder.",
         (),
     ),
     (
@@ -190,6 +196,7 @@ _TIER_HINTS = (
         (
             ("mechanical", "for mechanical tasks {model} is cheaper"),
             ("implementation", "for standard implementation {model} suffices"),
+            ("planning", "for planning delegate to a {model} sub-agent"),
         ),
     ),
     (
@@ -198,6 +205,7 @@ _TIER_HINTS = (
         (
             ("mechanical", "for mechanical tasks {model} is cheaper"),
             ("architecture", "for architecture or deep analysis {model} is better"),
+            ("planning", "for planning delegate to a {model} sub-agent"),
         ),
     ),
     (

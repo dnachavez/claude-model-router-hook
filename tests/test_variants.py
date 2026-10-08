@@ -59,18 +59,20 @@ These rules apply to YOU and to every sub-agent you spawn.
 | Class | Target model | Effort | When to use |
 |---|---|---|---|
 | mechanical | haiku | none | Git ops, renames, formatting, lint, file moves, version bumps, quick lookups, short imperative tasks. |
+| planning | fable | high | Implementation plans, roadmaps, task breakdowns, plan-mode requests, and anything asked for before code is written. |
 | implementation | opus | medium | Writing or editing code, building features, creating components or APIs, writing tests, standard feature work. |
 | debugging | opus | high | Diagnosing failures, flaky tests, races, regressions, stack traces, bisecting, reproducing bugs. |
 | architecture | opus | xhigh | Architecture decisions, tradeoff analysis, redesigns, deep multi-file analysis, sustained reasoning over large context. |
-| extreme | opus | max | Multi-system migrations, codebase-wide rewrites, long-horizon plans, RFCs and design docs, platform-scale work. |
+| extreme | opus | max | Multi-system migrations, codebase-wide rewrites, long-horizon programs, RFCs and design docs, platform-scale work. |
 | abstain | (no routing) | - | Prompt does not clearly match any class; current model and effort pass through unmodified. |
 
 ### Sub-agent model selection (MANDATORY)
 
 When calling the Agent tool, set the model parameter to match the task class
 above. Do not default every sub-agent to the highest effort. Match the model
-and effort to the work: mechanical work goes to haiku, implementation to opus,
-debugging to opus, deep analysis to opus, and platform-scale work to opus.
+and effort to the work: mechanical work goes to haiku, planning to fable,
+implementation to opus, debugging to opus, deep analysis to opus, and platform-
+scale work to opus.
 """
 
 TRIGGERS = (
@@ -257,7 +259,11 @@ class TestAdvisoryMatchesEnforcement(unittest.TestCase):
         cfg = copy.deepcopy(DEFAULTS)
         cfg["classes"]["implementation"]["target"] = {"model": "gpt-9"}
         context = render_session_context("claude-opus-5", cfg)
-        self.assertIn("For mechanical tasks haiku is cheaper.", context)
+        self.assertIn(
+            "For mechanical tasks haiku is cheaper; "
+            "for planning delegate to a fable sub-agent.",
+            context,
+        )
         self.assertNotIn("standard implementation", context)
 
     def test_tier_hint_survives_every_class_being_unroutable(self):
@@ -285,7 +291,8 @@ class TestSessionInitUsesConfig(unittest.TestCase):
                        ("routed-opus-medium", "opus", "medium", ("implementation",)),
                        ("routed-opus-high", "opus", "high", ("debugging",)),
                        ("routed-opus-xhigh", "opus", "xhigh", ("architecture",)),
-                       ("routed-opus-max", "opus", "max", ("extreme",))])
+                       ("routed-opus-max", "opus", "max", ("extreme",)),
+                       ("routed-fable-high", "fable", "high", ("planning",))])
             context = self._context(home)
             self.assertNotIn("sonnet", context)
             self.assertIn("| implementation | opus | medium |", context)
@@ -357,6 +364,7 @@ class TestVariantMap(unittest.TestCase):
             variants.variant_map(copy.deepcopy(DEFAULTS)),
             {
                 ("haiku", None): "routed-haiku",
+                ("fable", "high"): "routed-fable-high",
                 ("opus", "medium"): "routed-opus-medium",
                 ("opus", "high"): "routed-opus-high",
                 ("opus", "xhigh"): "routed-opus-xhigh",
@@ -416,6 +424,7 @@ class TestVariantClosure(unittest.TestCase):
     def test_single_effort_config_closure_covers_the_floor(self):
         """The reported regression: all reasoning classes on one effort."""
         cfg = _cfg(
+            planning={"model": "opus", "effort": "medium"},
             implementation={"model": "opus", "effort": "medium"},
             debugging={"model": "opus", "effort": "medium"},
             architecture={"model": "opus", "effort": "medium"},
@@ -587,9 +596,9 @@ class TestVariantGenerator(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
             self.assertEqual(
                 sorted(os.listdir(agents)),
-                ["routed-haiku.md", "routed-opus-high.md",
-                 "routed-opus-max.md", "routed-opus-medium.md",
-                 "routed-opus-xhigh.md"],
+                ["routed-fable-high.md", "routed-haiku.md",
+                 "routed-opus-high.md", "routed-opus-max.md",
+                 "routed-opus-medium.md", "routed-opus-xhigh.md"],
             )
             self.assertFalse(os.path.exists(stale))
 
@@ -633,19 +642,19 @@ class TestVariantGenerator(unittest.TestCase):
     def test_prune_removes_a_pre_key_generated_file(self):
         """Upgrade path: a stale variant from before the key is still pruned."""
         with tempfile.TemporaryDirectory() as agents:
-            legacy = os.path.join(agents, "routed-fable-high.md")
+            legacy = os.path.join(agents, "routed-fable-max.md")
             with open(legacy, "w") as fh:
                 fh.write(
-                    "---\nname: routed-fable-high\n"
+                    "---\nname: routed-fable-max\n"
                     "description: Router-managed variant for extreme tasks. "
                     "Spawned by the model router hook; do not invoke directly.\n"
-                    "model: fable\neffort: high\n---\n\n"
+                    "model: fable\neffort: max\n---\n\n"
                     "Complete the delegated task exactly as prompted; "
                     "return a concise report.\n"
                 )
             proc = self._run("--agents-dir", agents)
             self.assertEqual(proc.returncode, 0, proc.stdout)
-            self.assertIn("REMOVED: routed-fable-high.md", proc.stdout)
+            self.assertIn("REMOVED: routed-fable-max.md", proc.stdout)
             self.assertFalse(os.path.exists(legacy))
 
     def test_remove_failure_exits_non_zero(self):
@@ -655,10 +664,10 @@ class TestVariantGenerator(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             agents = os.path.join(tmp, "agents")
             os.makedirs(agents)
-            stale = os.path.join(agents, "routed-fable-high.md")
+            stale = os.path.join(agents, "routed-fable-max.md")
             with open(stale, "w") as fh:
                 fh.write(variants.agent_markdown(
-                    "routed-fable-high", "fable", "high", ("extreme",)))
+                    "routed-fable-max", "fable", "max", ("extreme",)))
             for name, model, effort, classes in variants.target_variants(
                 copy.deepcopy(DEFAULTS)
             ):
@@ -718,9 +727,9 @@ class TestInstallScript(unittest.TestCase):
             installed = sorted(os.listdir(os.path.join(home, ".claude", "agents")))
             self.assertEqual(
                 installed,
-                ["routed-haiku.md", "routed-opus-high.md",
-                 "routed-opus-max.md", "routed-opus-medium.md",
-                 "routed-opus-xhigh.md"],
+                ["routed-fable-high.md", "routed-haiku.md",
+                 "routed-opus-high.md", "routed-opus-max.md",
+                 "routed-opus-medium.md", "routed-opus-xhigh.md"],
             )
 
     def test_generator_conflict_aborts_the_install(self):
@@ -882,6 +891,7 @@ class TestMinGatedTarget(unittest.TestCase):
 
     def test_all_haiku_config_has_nothing_to_escalate_to(self):
         cfg = _cfg(
+            planning={"model": "haiku"},
             implementation={"model": "haiku"}, debugging={"model": "haiku"},
             architecture={"model": "haiku"}, extreme={"model": "haiku"},
         )
@@ -947,6 +957,7 @@ class TestGatedBumpFollowsConfig(unittest.TestCase):
     def test_all_haiku_config_keeps_the_decision_invariant(self):
         """Nothing above haiku exists, so no effort may be attached to it."""
         cfg = _cfg(
+            planning={"model": "haiku"},
             implementation={"model": "haiku"}, debugging={"model": "haiku"},
             architecture={"model": "haiku"}, extreme={"model": "haiku"},
         )
@@ -1041,6 +1052,7 @@ class TestGateNeverReachesOutsideTheConfig(unittest.TestCase):
 
     def test_no_legal_target_leaves_the_decision_alone(self):
         cfg = _cfg(
+            planning={"model": "haiku"},
             implementation={"model": "haiku"}, debugging={"model": "haiku"},
             architecture={"model": "haiku"}, extreme={"model": "haiku"},
         )

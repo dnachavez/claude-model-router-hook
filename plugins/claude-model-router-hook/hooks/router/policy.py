@@ -10,6 +10,7 @@ from .taxonomy import CLASSES
 # the target tier must not lose the depth expected for architecture-scale work.
 # ``max`` remains intact for an extreme target; the floor only raises effort.
 _SAME_TIER_EFFORT_FLOORS = {
+    "planning": "high",
     "architecture": "xhigh",
     "extreme": "xhigh",
 }

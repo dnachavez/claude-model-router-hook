@@ -3,6 +3,7 @@
 
 Thin wiring only; all logic lives in the router package. Exit 0 = allow,
 exit 2 = warn or autoswitch notice (stderr, prompt blocked for resend).
+A planning prompt in "delegate" mode exits 0 with additionalContext instead.
 """
 
 import json
@@ -19,6 +20,38 @@ V1_HINT = (
     "Update model-router.json to the v2 schema (add \"version\": 2). "
     "This hint is shown once."
 )
+
+PLANNING_SPAWN_PREFIX = "Create an implementation plan for"
+
+
+def _planning_delegate_context(decision, cfg):
+    """Instructions that hand a planning prompt to a sub-agent on the target tier.
+
+    The PreToolUse hook routes the spawn by classifying its prompt, so the
+    fixed opening phrase is what lands it on the planning target. When that
+    hook will not rewrite the spawn (Fable gate off, enforcement not "on"),
+    the model has to be pinned on the call instead.
+    """
+    pin = (
+        cfg.get("subagent_enforcement") != "on"
+        or (decision.model == "fable" and not cfg.get("allow_fable_autoswitch"))
+    )
+    spawn = (
+        f'2. Spawn an Agent whose prompt starts with "{PLANNING_SPAWN_PREFIX}" '
+        f"and carries that context, so it routes to {decision.model}"
+    )
+    if pin:
+        spawn += f'. Pass model: "{decision.model}" explicitly on that call'
+    spawn += ". The sub-agent only reads and plans; it does not edit files."
+    return "\n".join((
+        f"Model router: this is a planning request. Produce the plan on "
+        f"{decision.model} through a sub-agent rather than in this session:",
+        "1. Gather the context the plan needs (relevant files, constraints, "
+        "existing patterns) in this session.",
+        spawn,
+        "3. Review the returned plan, present it to the user, and wait for "
+        "their approval before executing any of it.",
+    ))
 
 
 def _v1_config_detected(global_path, cwd=None):
@@ -86,6 +119,20 @@ def main():
     # fire here and not only on the subagent path (F1). Gating is monotonic and
     # idempotent, so an already-gated decision passes through unchanged.
     decision = policy.apply_gates(prompt, decision, cfg)
+
+    if decision.klass == "planning" and cfg.get("planning_delivery") == "delegate":
+        hookio.log(
+            f"DELEGATE->{decision.model}",
+            prompt,
+            model=current_model,
+            effort=current_effort,
+            klass=decision.klass,
+            target_effort=decision.effort,
+        )
+        hookio.emit_prompt_context(
+            _planning_delegate_context(decision, cfg), system_message=hint
+        )
+        sys.exit(0)
 
     _, suffix = ladder.split_suffix(current_model)  # suffix preserved (FR-6)
     if decision.model != ladder.detect_tier(current_model):

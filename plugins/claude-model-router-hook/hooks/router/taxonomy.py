@@ -5,16 +5,27 @@ import re
 
 from .config import resolve_list, safe_regex_match
 
-CLASSES = ("mechanical", "implementation", "debugging", "architecture", "extreme")
+CLASSES = (
+    "mechanical", "planning", "implementation", "debugging", "architecture",
+    "extreme",
+)
 
 # Caps per signal type (FR-7): no single signal type can force a tier.
 TEXT_CAP = 6
 EXTREME_CAP = 3
 EXTREME_ESCALATION_MIN = 2
+PLANNING_INTENT_BONUS = 6
 
 # Default text signals per class (config-extendable via classes.<name>).
 DEFAULT_KEYWORDS = {
     "mechanical": [],
+    # Phrases only: a bare "plan" is as often a noun ("subscription plan",
+    # PlanCard) as a request to plan, so it never scores on its own.
+    "planning": [
+        "implementation plan", "step-by-step plan",
+        "action plan", "execution plan", "work breakdown", "task breakdown",
+        "roadmap", "milestones",
+    ],
     "implementation": [],
     "debugging": ["deadlock", "intermittent", "segfault", "corrupt"],
     # High-frequency English words (design, decision, approach, propose, should
@@ -26,7 +37,7 @@ DEFAULT_KEYWORDS = {
         "architect", "architecture", "evaluate", "tradeoff", "trade-off",
         "strategy", "strategic", "compare approaches", "why does", "deep dive",
         "redesign", "across the codebase", "investor", "multi-system",
-        "complex refactor", "tradeoff analysis", "plan mode", "rethink",
+        "complex refactor", "tradeoff analysis", "rethink",
         "high-stakes", "critical decision", "design decision",
         "architecture decision", "design doc", "propose an approach",
         "the right approach", "which approach", "how should we design",
@@ -62,6 +73,11 @@ DEFAULT_PATTERNS = {
         r"\bprettier\b", r"\beslint\b", r"\bremove\s+(unused|dead)\b",
         r"\bupdate\s+(version|package)\b",
     ],
+    "planning": [
+        r"\bplan\s+mode\b", r"\bplan\s+(?:out|ahead)\b",
+        r"\bbreak\s+(?:\S+\s+){0,6}?down\s+into\b",
+        r"\b(?:phases?|sequence|order)\s+(?:the|this)\s+work\b",
+    ],
     "implementation": [
         r"\bbuild\b", r"\bimplement\b", r"\bcreate\b", r"\bfix\b",
         r"\badd\s+feature\b", r"\bwrite\b", r"\bcomponent\b",
@@ -82,6 +98,39 @@ DEFAULT_PATTERNS = {
     "architecture": [],
     "extreme": [r"\brfc\b", r"\bdesign\s+doc\b", r"\bmigration\s+plan\b", r"\bprogram\b"],
 }
+
+# An explicit request to produce a plan, as opposed to "plan" the noun.  A
+# match counts as task intent and outweighs incidental architecture or extreme
+# vocabulary, so "make a migration plan across all services" is planning work.
+# The modifier and follower lists keep product-domain plans ("create the
+# subscription plan", "add a plan selector") out of it.
+_PLAN_NOUN_MODIFIERS = (
+    r"(?:subscription|pricing|billing|payment|premium|free|paid|trial|annual|"
+    r"monthly|yearly|pro|enterprise|starter|basic|data|phone|meal|insurance)\b"
+)
+_PLAN_NOUN_FOLLOWERS = (
+    r"model|card|table|tier|id|page|component|selector|picker|field|name|type|"
+    r"schema|price|pricing|limit|upgrade|downgrade|object|entity|record|row|"
+    r"column|key"
+)
+_PLANNING_INTENT_RE = re.compile(
+    r"\b(?:make|create|write|draft|give\s+me|put\s+together|come\s+up\s+with|"
+    r"propose|outline|prepare|produce|need|want)\s+"
+    r"(?:(?:me\s+)?(?:a|an|the|our)\s+)?"
+    r"(?:(?!" + _PLAN_NOUN_MODIFIERS + r")[\w-]+\s+){0,3}?"
+    r"plan\b(?!\s*[-_]?(?:" + _PLAN_NOUN_FOLLOWERS + r")s?\b)|"
+    r"^\s*(?:please\s+)?(?:(?:a|an|the)\s+)?"
+    r"(?:\w+-level|detailed|full|phased|step-by-step)\s+plan\s+(?:to|for)\b|"
+    r"^\s*(?:please\s+)?plan\s+(?:the|a|an|our|this|how|out|it)\b|"
+    r"\blet'?s\s+plan\b|\blet\s+us\s+plan\b|\bhelp\s+me\s+plan\b|"
+    r"\bplan\s+out\b|\broadmap\s+for\b|"
+    r"\bbreak\s+(?:\S+\s+){0,6}?down\s+into\b|"
+    r"\bhow\s+should\s+(?:we|i)\s+approach\b|"
+    r"\b(?:use|enter|in|switch\s+to)\s+plan\s+mode\b|"
+    r"\bbefore\s+(?:writing|touching|changing)\s+any\s+code\b|"
+    r"\bbefore\s+(?:we|you|i)\s+(?:write|start)\s+(?:any\s+)?(?:code|coding)\b",
+    re.IGNORECASE,
+)
 
 # Routing should react to a request to do coding work, not merely to the
 # vocabulary inside a quoted document, error corpus, or a bag of taxonomy
@@ -162,6 +211,11 @@ def _looks_like_keyword_bag(prompt_lower):
     return len(words) >= 5 and all(word in _KEYWORD_BAG_WORDS for word in words)
 
 
+def has_planning_intent(prompt):
+    """Whether the prompt explicitly asks for a plan rather than mentioning one."""
+    return isinstance(prompt, str) and bool(_PLANNING_INTENT_RE.search(prompt))
+
+
 def has_task_intent(prompt):
     """Whether text is plausibly a coding-assistant request.
 
@@ -177,6 +231,7 @@ def has_task_intent(prompt):
         return False
     return bool(
         _TASK_PREFIX_RE.search(prompt)
+        or _PLANNING_INTENT_RE.search(prompt)
         or _TASK_QUESTION_RE.search(prompt)
         or _PROBLEM_REPORT_RE.search(prompt)
         or _HELP_RE.search(prompt)
@@ -198,9 +253,15 @@ def score(prompt, cfg):
     scores = {klass: 0.0 for klass in CLASSES}
 
     # Text signals (keyword/pattern hit = +2, cap +6 per class).
-    for klass in ("mechanical", "implementation", "debugging", "architecture"):
+    for klass in (
+        "mechanical", "planning", "implementation", "debugging", "architecture"
+    ):
         keywords, patterns = _resolve_lists(klass, cfg)
         scores[klass] += _text_score(prompt_lower, keywords, patterns)
+
+    planning_intent = has_planning_intent(prompt)
+    if planning_intent:
+        scores["planning"] += PLANNING_INTENT_BONUS
 
     # Structural/length signals (per-class caps).
     if 1 <= word_count <= 12:  # short imperative
@@ -241,9 +302,15 @@ def score(prompt, cfg):
     # architecture-gated escalation must still get a chance to fire (F5). The
     # primary class pick below is left unchanged; escalation only promotes to
     # extreme when the extreme markers actually clear the threshold.
-    base = ("mechanical", "implementation", "debugging", "architecture")
+    # A request for a plan of extreme-scale work is still planning: escalating
+    # it would route the plan itself to the extreme target.
+    base = ("mechanical", "planning", "implementation", "debugging", "architecture")
     base_top_score = scores[_top_of(base)]
-    if scores["architecture"] >= base_top_score and scores["architecture"] > 0:
+    if (
+        not planning_intent
+        and scores["architecture"] >= base_top_score
+        and scores["architecture"] > 0
+    ):
         ex_keywords, ex_patterns = _resolve_lists("extreme", cfg)
         extremity = _text_score(
             prompt_lower, ex_keywords, ex_patterns, per_hit=1, cap=EXTREME_CAP

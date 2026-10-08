@@ -115,6 +115,12 @@
           "default": false,
           "description": "Allow the router to autoswitch/inject a custom fable target. When false, fable decisions behave like warn."
         },
+        "planning_delivery": {
+          "type": "string",
+          "enum": ["delegate", "switch"],
+          "default": "delegate",
+          "description": "How a planning prompt reaches the planning target from a lower-tier session. \"delegate\" lets the prompt through and tells the session to hand the plan to a sub-agent on the planning target; \"switch\" warns and blocks like any other class."
+        },
         "subagent_enforcement": {
           "type": "string",
           "enum": ["on", "advisory", "off"],
@@ -183,7 +189,7 @@
         },
         "classes": {
           "type": "object",
-          "description": "Per-class routing configuration keyed by class name (mechanical, implementation, debugging, architecture, extreme, or custom).",
+          "description": "Per-class routing configuration keyed by class name (mechanical, planning, implementation, debugging, architecture, extreme, or custom). planning covers explicit requests for an implementation plan, roadmap, or task breakdown.",
           "additionalProperties": { "$ref": "#/definitions/v2ClassConfig" }
         },
         "capability_gates": {

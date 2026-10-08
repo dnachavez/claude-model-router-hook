@@ -178,6 +178,19 @@ def is_child():
     return bool(os.environ.get(CHILD_ENV))
 
 
+def emit_prompt_context(additional_context, system_message=None):
+    """Print UserPromptSubmit hook JSON that adds context without blocking."""
+    output = {
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": additional_context,
+        }
+    }
+    if system_message is not None:
+        output["systemMessage"] = system_message
+    print(json.dumps(output))
+
+
 def emit_pretooluse(updated_input=None, system_message=None):
     """Print PreToolUse hook JSON with permissionDecision "allow" to stdout."""
     output = {
